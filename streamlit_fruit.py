@@ -5,19 +5,7 @@ Demo of interactive filtering with Streamlit using dummy data
 import streamlit as st
 import pandas as pd
 import numpy as np
-
-# Dummy data
-df = pd.DataFrame({
-    'fruit': ['apple', 'banana', 'lemon', 'strawberry', 'cherry', 'raspberry'],
-    'colour': ['green', 'yellow', 'yellow', 'red', 'red', 'red'],
-    'hardness': ['hard', 'soft', 'hard', 'soft', 'soft', 'soft'],
-    'weight': [250., 300., 200., 40., 20., 15.],
-    'expiry': [pd.to_datetime(d) for d in ['2023-03-31','2023-03-10','2023-03-02','2023-03-01','2023-03-21','2023-03-11']],
-    'description': [f'This is a {adj} fruit' for adj in ['round', 'bendy', 'citrus', 'delicious', 'stone', 'lovely',]],
-    'origin': ['ontario', 'dominican republic', 'florida', 'ontario', 'bc', 'bc'],
-    'shipper': ['clive', 'derek', 'james', 'ed', 'greg', 'alex'],
-    'shipped': [pd.to_datetime(d) for d in ['2023-02-28','2023-02-10','2023-02-02','2023-02-01','2023-02-21','2023-02-11']],
-})
+from typing import List
 
 # define extended lists
 fruits = ['apple', 'banana', 'lemon', 'strawberry', 'cherry', 'raspberry', 'orange', 'peach', 'grapefruit', 'blueberry']
@@ -29,7 +17,7 @@ shippers = np.random.choice(['clive', 'derek', 'james', 'ed', 'greg', 'alex', 'e
 # create dataframe
 np.random.seed(23)
 df = pd.DataFrame({
-    'fruit': np.repeat(fruits, 3)[:30], # ensure matching fruit/colour pairs
+    'fruit': np.tile(fruits, 3)[:30],
     'colour': np.tile(colours, 3)[:30],
     'hardness': np.random.choice(['hard', 'soft'], size=30),
     'weight': np.random.uniform(10, 500, size=30),
@@ -46,14 +34,23 @@ def run():
     # Search query box plus filters to apply before searching
     st.title('Interactive Filter Test With Fruit')
     st.subheader('Search Term and Search Filters')
-    s = st.text_input('Type at least one character to search the fruit database').strip()
+    s = st.text_input('Type at least one character to search the fruit database').strip().lower()
+    # catch the case when square brackets are used in the search term
+    if '[' in s and ']' not in s[s.find('['):]:
+        s = s.replace('[', '')
+        # temporarily display a warning message in streamlit
+        st.warning('Unpaired square brackets are not allowed in the search term.  They have been removed.')
+    if ']' in s and '[' not in s[:s.find(']')]:
+        s = s.replace(']', '')
+        st.warning('Unpaired square brackets are not allowed in the search term.  They have been removed.')
+
     colours_all = sorted(df['colour'].unique())
     hardness_all = sorted(df['hardness'].unique())
     c1, c2 = st.columns(2)
     colours_searched = c1.multiselect('Colours to search', colours_all, default=colours_all)
     hardness_searched = c2.multiselect('Hardness to search', hardness_all, default=hardness_all)
 
-    def filter_df(s, c, h): # search, colours, hardness
+    def filter_df(s: str, c: str, h: str) -> pd.DataFrame: # search, colours, hardness
         return df[df['fruit'].str.contains(s) & df['colour'].isin(c) & df['hardness'].isin(h)]
 
     # simulate search by retrieving filtered results
@@ -71,7 +68,7 @@ def run():
         if searched:
             st.dataframe(df_after_search, use_container_width=True)
         else:
-            st.write('Nothing to see here until you serch for text.')
+            st.write('Nothing to see here until you search for text.')
 
     # now set up refinement filters for different parameters, to allow refinement of the search results
     fruits_for_refinement = list(sorted(df_after_search['fruit'].unique()))
@@ -97,7 +94,7 @@ def run():
     st.write('Filters below are applied to the displayed results sets independently')
 
     # Display a details section for a given set of display columns.  Must have a date col
-    def display_details(details_title, date_col, display_columns):
+    def display_details(details_title: str, date_col: str, display_columns: List[str]) -> None:
         expander = st.expander(f'**{details_title}**', expanded=False)
         with expander:
             if len(df_after_refinement) > 0:  # have some results
@@ -133,6 +130,8 @@ def run():
 
     display_details(details_title = 'Descriptions', date_col = 'expiry', display_columns = ['fruit', 'expiry', 'description'])
     display_details(details_title = 'Logistics', date_col = 'shipped', display_columns = ['fruit', 'shipped', 'origin', 'shipper', 'weight'])
+
+
 
 if __name__ == '__main__':
     run()
